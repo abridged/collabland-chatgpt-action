@@ -1,4 +1,4 @@
-name: Build @collabland/token-price-action
+name: Build @collabland/chatgpt-action
 
 on:
   push:

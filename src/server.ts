@@ -1,12 +1,12 @@
 // Copyright Abridged, Inc. 2023. All Rights Reserved.
-// Node module: @collabland/token-price-action
+// Node module: @collabland/chatgpt-action
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
 import {generateEcdsaKeyPair, generateEd25519KeyPair} from '@collabland/action';
 import {getEnvVar, setEnvVar} from '@collabland/common';
 import {ApplicationConfig} from '@loopback/core';
-import {HelloActionApplication} from './application.js';
+import {ChatGPTActionApplication} from './application.js';
 
 export async function main(config: ApplicationConfig = {}, publicKey?: string) {
   publicKey =
@@ -43,19 +43,19 @@ export async function main(config: ApplicationConfig = {}, publicKey?: string) {
     // Set the public key
     setEnvVar('COLLABLAND_ACTION_PUBLIC_KEY', publicKey, true);
   }
-  const app = new HelloActionApplication(config);
+  const app = new ChatGPTActionApplication(config);
   await app.start();
 
   const url = app.restServer.url;
   if (config.rest == null) {
-    console.log(`Hello action is running at ${url}`);
+    console.log(`ChatGPT action is running at ${url}`);
   }
   return {app, signingKey};
 }
 
 if (require.main === module) {
   main().catch(err => {
-    console.error('Fail to start the HelloWorld action: %O', err);
+    console.error('Fail to start the ChatGPT action: %O', err);
     process.exit(1);
   });
 }

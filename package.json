@@ -1,5 +1,5 @@
 {
-  "name": "@collabland/token-price-action",
+  "name": "@collabland/chatgpt-action",
   "version": "0.0.1",
   "description": "CollabLand Hello action",
   "keywords": [
@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:abridged/collabland-hello-action.git"
+    "url": "git@github.com:abridged/collabland-chatgpt-action.git"
   },
   "publishConfig": {
     "access": "public"
@@ -48,6 +48,7 @@
     "@loopback/rest": "^12.0.8",
     "discord-api-types": "^0.37.35",
     "discord.js": "^14.7.1",
+    "openai": "^3.2.1",
     "tslib": "^2.0.0"
   },
   "devDependencies": {
