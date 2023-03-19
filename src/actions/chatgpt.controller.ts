@@ -37,7 +37,12 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import {Configuration, CreateCompletionResponse, OpenAIApi} from 'openai';
+import {
+  Configuration,
+  CreateChatCompletionResponse,
+  CreateCompletionResponse,
+  OpenAIApi,
+} from 'openai';
 
 const debug = debugFactory('collabland:chatgpt');
 /**
@@ -63,14 +68,14 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     this.chatgpt = new OpenAIApi(configuration);
   }
 
-  async ask(prompt: string): Promise<CreateCompletionResponse> {
+  async ask(prompt: string): Promise<CreateChatCompletionResponse> {
     console.log('ChatGPT prompt: %s', prompt);
-    const completion = await this.chatgpt.createCompletion({
-      model: 'text-davinci-003',
-      prompt,
+    const completion = await this.chatgpt.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: [{role: 'user', content: prompt}],
       temperature: 0.6,
       // n: 5,
-      max_tokens: 256,
+      max_tokens: 1024,
     });
     console.log('ChatGPT response: %s', stringify(completion.data));
     return completion.data;
@@ -201,22 +206,33 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     prompt: string,
   ) {
     const answer = await this.ask(prompt);
-
+    const content = answer?.choices[0].message?.content ?? '';
     // Return the 1st response to Discord
     await this.followupMessage(request, {
-      content: answer?.choices[0].text ?? '',
+      content,
+      /*
+      embeds: [
+        new EmbedBuilder()
+          .setAuthor({
+            name: 'ChatGPT',
+            url: 'https://chat.openai.com/',
+          })
+          .setDescription(content)
+          .toJSON(),
+      ],
+      */
       components: [
         new ActionRowBuilder<MessageActionRowComponentBuilder>()
           .addComponents(
             new ButtonBuilder()
               .setCustomId('chatgpt:ask')
               .setEmoji('🙋‍♂️')
-              .setLabel('Prompt')
+              .setLabel('Chat more')
               .setStyle(ButtonStyle.Primary),
             new ButtonBuilder()
               .setCustomId('chatgpt:sponsor')
               .setEmoji('🎁')
-              .setLabel('Tip this action developer')
+              .setLabel('Tip the action developer')
               .setStyle(ButtonStyle.Success),
           )
           .toJSON(),
