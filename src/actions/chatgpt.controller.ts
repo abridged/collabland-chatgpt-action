@@ -3,7 +3,12 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {debugFactory, getEnvVar, stringify} from '@collabland/common';
+import {
+  debugFactory,
+  getEnvVar,
+  resolvePromiseWithTimeout,
+  stringify,
+} from '@collabland/common';
 import {
   APIChatInputApplicationCommandInteraction,
   APIInteractionResponse,
@@ -70,15 +75,20 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
 
   async ask(prompt: string): Promise<CreateChatCompletionResponse> {
     console.log('ChatGPT prompt: %s', prompt);
-    const completion = await this.chatgpt.createChatCompletion({
+    const completion = this.chatgpt.createChatCompletion({
       model: 'gpt-3.5-turbo',
       messages: [{role: 'user', content: prompt}],
       temperature: 0.6,
       // n: 5,
       max_tokens: 1024,
     });
-    console.log('ChatGPT response: %s', stringify(completion.data));
-    return completion.data;
+    const res = await resolvePromiseWithTimeout(
+      completion,
+      30000,
+      'Timeout: ChatGPT does not respond in 30 seconds',
+    );
+    console.log('ChatGPT response: %s', stringify(res.data));
+    return res.data;
   }
 
   /**
@@ -168,6 +178,11 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
         if (prompt != null) {
           this.prompt(request, prompt!).catch(err => {
             debug('Fail to generate response: %O', err);
+            this.followupMessage(request, {
+              content: `ChatGPT error: ${err}`,
+            }).catch(err => {
+              // Ignore
+            });
           });
           return {
             type: InteractionResponseType.DeferredChannelMessageWithSource,
@@ -256,6 +271,11 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
       const prompt = promptInput?.value;
       this.prompt(request, prompt!).catch(err => {
         debug('Fail to generate response: %O', err);
+        this.followupMessage(request, {content: `ChatGPT error: ${err}`}).catch(
+          err => {
+            // Ignore
+          },
+        );
       });
       return {
         type: InteractionResponseType.DeferredChannelMessageWithSource,
