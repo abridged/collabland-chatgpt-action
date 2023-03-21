@@ -77,7 +77,15 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     console.log('ChatGPT prompt: %s', prompt);
     const completion = this.chatgpt.createChatCompletion({
       model: 'gpt-3.5-turbo',
-      messages: [{role: 'user', content: prompt}],
+      messages: [
+        /*
+        {
+          role: 'assistant',
+          content: '',
+        },
+        */
+        {role: 'user', content: prompt},
+      ],
       temperature: 0.6,
       // n: 5,
       max_tokens: 1024,
@@ -176,14 +184,7 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
         const prompt = getCommandOptionValue(request, 'prompt');
         let answer: CreateCompletionResponse | undefined = undefined;
         if (prompt != null) {
-          this.prompt(request, prompt!).catch(err => {
-            debug('Fail to generate response: %O', err);
-            this.followupMessage(request, {
-              content: `ChatGPT error: ${err}`,
-            }).catch(err => {
-              // Ignore
-            });
-          });
+          this.invokeChatGPT(request, prompt);
           return {
             type: InteractionResponseType.DeferredChannelMessageWithSource,
             data: {
@@ -269,14 +270,7 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
         c => c.custom_id === 'chatgpt:prompt',
       );
       const prompt = promptInput?.value;
-      this.prompt(request, prompt!).catch(err => {
-        debug('Fail to generate response: %O', err);
-        this.followupMessage(request, {content: `ChatGPT error: ${err}`}).catch(
-          err => {
-            // Ignore
-          },
-        );
-      });
+      this.invokeChatGPT(request, prompt);
       return {
         type: InteractionResponseType.DeferredChannelMessageWithSource,
         data: {
@@ -288,6 +282,20 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     return buildSimpleResponse(
       `Modal ${request.data.custom_id} is not implemented.`,
     );
+  }
+
+  private invokeChatGPT(
+    request: DiscordActionRequest<APIInteraction>,
+    prompt: string | undefined,
+  ) {
+    this.prompt(request, prompt!).catch(err => {
+      debug('Fail to generate response: %O', err.response?.data ?? err);
+      this.followupMessage(request, {
+        content: `ChatGPT error: ${
+          err.isAxiosError ? err.response.data.error.message : err
+        }`,
+      }).catch(err => {});
+    });
   }
 
   /**
