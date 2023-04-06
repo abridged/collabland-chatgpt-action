@@ -53,9 +53,4 @@ export async function main(config: ApplicationConfig = {}, publicKey?: string) {
   return {app, signingKey};
 }
 
-if (require.main === module) {
-  main().catch(err => {
-    console.error('Fail to start the ChatGPT action: %O', err);
-    process.exit(1);
-  });
-}
+await main();
