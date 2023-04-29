@@ -1,4 +1,4 @@
-import {getFetch, handleFetchResponse} from '@collabland/common';
+import {getEnvVar, getFetch, handleFetchResponse} from '@collabland/common';
 import {OpenApiToolkit, createOpenApiAgent} from 'langchain/agents';
 import {OpenAI} from 'langchain/llms/openai';
 import {JsonObject, JsonSpec} from 'langchain/tools';
@@ -10,7 +10,7 @@ async function main() {
 
   const headers = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    Authorization: `Bearer ${getEnvVar('OPENAI_API_KEY')}`,
   };
   const model = new OpenAI({temperature: 0});
   const toolkit = new OpenApiToolkit(new JsonSpec(data), model, headers);

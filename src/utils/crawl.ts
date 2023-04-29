@@ -1,10 +1,11 @@
 import {generateIdSync, getEnvVar} from '@collabland/common';
-import {PineconeClient, Vector} from '@pinecone-database/pinecone';
+import {Vector} from '@pinecone-database/pinecone';
 import {OpenAIEmbeddings} from 'langchain/embeddings/openai';
 import {TokenTextSplitter} from 'langchain/text_splitter';
 
 import {Document} from 'langchain/document';
 import {PuppeteerWebBaseLoader} from 'langchain/document_loaders/web/puppeteer';
+import {getPineconeClient} from './pinecone.js';
 
 async function loadUrl(url: string) {
   /**
@@ -25,21 +26,6 @@ async function loadUrl(url: string) {
   return docs;
 }
 
-let pinecone: PineconeClient | null = null;
-
-const initPineconeClient = async () => {
-  pinecone = new PineconeClient();
-  console.log('init pinecone');
-  await pinecone.init({
-    environment: process.env.PINECONE_ENVIRONMENT!,
-    apiKey: process.env.PINECONE_API_KEY!,
-  });
-};
-
-type Response = {
-  message: string;
-};
-
 const truncateStringByBytes = (str: string, bytes: number) => {
   const enc = new TextEncoder();
   return new TextDecoder('utf-8').decode(enc.encode(str).slice(0, bytes));
@@ -54,9 +40,7 @@ const sliceIntoChunks = (arr: Vector[], chunkSize: number) => {
 export async function main(url: string) {
   const pineconeIndexName = getEnvVar('PINECONE_INDEX_NAME')!;
 
-  if (!pinecone) {
-    await initPineconeClient();
-  }
+  const pinecone = await getPineconeClient();
 
   const pages: Document<Record<string, any>>[] = [];
 

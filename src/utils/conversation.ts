@@ -1,87 +1,84 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
-import {PineconeClient} from '@pinecone-database/pinecone';
 import {ConversationalRetrievalQAChain} from 'langchain/chains';
 import {OpenAIEmbeddings} from 'langchain/embeddings/openai';
-import {OpenAI} from 'langchain/llms/openai';
+import {OpenAIChat} from 'langchain/llms/openai';
 
 import {getEnvVar} from '@collabland/common';
 import {ConversationSummaryMemory} from 'langchain/memory';
 import {PineconeStore} from 'langchain/vectorstores/pinecone';
+import {getPineconeClient} from './pinecone.js';
 
-const MODEL = 'gpt-3.5-turbo';
+const MODEL = 'gpt-4';
 
-const openAIApiKey = getEnvVar('OPENAI_API_KEY')!;
-const llm = new OpenAI({openAIApiKey, modelName: MODEL});
+export class CollabLandQA {
+  readonly llm: OpenAIChat;
 
-let pinecone: PineconeClient;
-
-async function initPineconeClient() {
-  pinecone = new PineconeClient();
-  await pinecone.init({
-    environment: getEnvVar('PINECONE_ENVIRONMENT')!,
-    apiKey: getEnvVar('PINECONE_API_KEY')!,
-  });
-}
-
-async function getVectorStore() {
-  if (pinecone == null) {
-    await initPineconeClient();
+  constructor() {
+    const openAIApiKey = getEnvVar('OPENAI_API_KEY')!;
+    this.llm = new OpenAIChat({openAIApiKey, modelName: MODEL});
   }
 
-  // Embed the user's intent and query the Pinecone index
-  const embedder = new OpenAIEmbeddings({
-    modelName: 'text-embedding-ada-002',
-  });
-  const vectorStore = new PineconeStore(embedder, {
-    pineconeIndex: pinecone.Index(getEnvVar('PINECONE_INDEX_NAME')!),
-  });
-  return vectorStore;
-}
+  async getVectorStore() {
+    const pinecone = await getPineconeClient();
 
-async function buildChain() {
-  const vectorStore = await getVectorStore();
+    // Embed the user's intent and query the Pinecone index
+    const embedder = new OpenAIEmbeddings({
+      modelName: 'text-embedding-ada-002',
+    });
+    const vectorStore = new PineconeStore(embedder, {
+      pineconeIndex: pinecone.Index(getEnvVar('PINECONE_INDEX_NAME')!),
+    });
+    return vectorStore;
+  }
 
-  const memory = new ConversationSummaryMemory({
-    memoryKey: 'chat_history',
-    llm,
-  });
+  async buildChain() {
+    const vectorStore = await this.getVectorStore();
 
-  const chain = ConversationalRetrievalQAChain.fromLLM(
-    llm,
-    vectorStore.asRetriever(5),
-    {
-      // returnSourceDocuments: true,
-    },
-  );
-  chain.memory = memory;
-  return chain;
-}
-
-export async function handleRequest({
-  prompt,
-  userId,
-}: {
-  prompt: string;
-  userId: string;
-}) {
-  try {
-    const chain = await buildChain();
-
-    const res = await chain.call({
-      question: prompt,
-      // chat_history: [],
+    const memory = new ConversationSummaryMemory({
+      memoryKey: 'chat_history',
+      llm: this.llm,
     });
 
-    console.log(res.text);
-    if (chain.memory != null) {
-      console.log('%O', await chain.memory.loadMemoryVariables({}));
+    const chain = ConversationalRetrievalQAChain.fromLLM(
+      this.llm,
+      vectorStore.asRetriever(5),
+      {
+        // returnSourceDocuments: true,
+        qaTemplate: `Use the following pieces of context and general knowledge to answer the 
+question at the end. If the provided context does enough information, give the general answer instead. 
+
+Context: {context}
+
+Question: {question}
+
+Helpful Answer:`,
+      },
+    );
+    chain.memory = memory;
+    console.log(chain.combineDocumentsChain.serialize());
+    return chain;
+  }
+
+  async ask(question: string) {
+    try {
+      const chain = await this.buildChain();
+
+      const res = await chain.call({
+        question,
+        // chat_history: [],
+      });
+
+      console.log(res.text);
+      if (chain.memory != null) {
+        console.log('%O', await chain.memory.loadMemoryVariables({}));
+      }
+      return res.text;
+    } catch (error) {
+      console.error(error);
     }
-  } catch (error) {
-    console.error(error);
   }
 }
 
-await handleRequest({
-  userId: 'raymond',
-  prompt: process.argv[2],
-});
+const qa = new CollabLandQA();
+const question = process.argv[2];
+await qa.ask(question);
