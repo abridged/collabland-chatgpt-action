@@ -1,5 +1,5 @@
 // Copyright Abridged, Inc. 2023. All Rights Reserved.
-// Node module: @collabland/example-chatgpt
+// Node module: @collabland/chatgpt-action
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
@@ -16,22 +16,22 @@ import {
   ApplicationCommandSpec,
   ApplicationCommandType,
   BaseDiscordActionController,
-  buildSimpleResponse,
   DiscordActionMetadata,
   DiscordActionRequest,
   DiscordActionResponse,
   DiscordInteractionPattern,
-  getCommandOptionValue,
   InteractionType,
+  buildSimpleResponse,
+  getCommandOptionValue,
 } from '@collabland/discord';
 import {MiniAppManifest} from '@collabland/models';
-import {asLifeCycleObserver, BindingScope, injectable} from '@loopback/core';
+import {BindingScope, asLifeCycleObserver, injectable} from '@loopback/core';
 import {api} from '@loopback/rest';
 import {
-  ActionRowBuilder,
   APIInteraction,
   APIMessageComponentInteraction,
   APIModalSubmitInteraction,
+  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   InteractionResponseType,
@@ -48,6 +48,7 @@ import {
   CreateCompletionResponse,
   OpenAIApi,
 } from 'openai';
+import {CollabLandQA} from '../utils/conversation.js';
 
 const debug = debugFactory('collabland:chatgpt');
 /**
@@ -63,6 +64,7 @@ const debug = debugFactory('collabland:chatgpt');
 @api({basePath: '/chatgpt'}) // Set the base path to `/chatgpt`
 export class ChatGPTController extends BaseDiscordActionController<APIInteraction> {
   private chatgpt: OpenAIApi;
+  private qa: CollabLandQA;
 
   constructor() {
     super();
@@ -71,6 +73,7 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
       apiKey: getEnvVar('OPENAI_API_KEY'),
     });
     this.chatgpt = new OpenAIApi(configuration);
+    this.qa = new CollabLandQA();
   }
 
   async ask(prompt: string): Promise<CreateChatCompletionResponse> {
@@ -97,6 +100,18 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     );
     console.log('ChatGPT response: %s', stringify(res.data));
     return res.data;
+  }
+
+  async askCL(prompt: string): Promise<string> {
+    console.log('ChatGPT prompt: %s', prompt);
+    const completion = this.qa.ask(prompt);
+    const res = await resolvePromiseWithTimeout(
+      completion,
+      30000,
+      'Timeout: ChatGPT does not respond in 30 seconds',
+    );
+    console.log('ChatGPT response: %s', res);
+    return res;
   }
 
   /**
@@ -220,9 +235,15 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
   private async prompt(
     request: DiscordActionRequest<APIInteraction>,
     prompt: string,
+    cl = true,
   ) {
-    const answer = await this.ask(prompt);
-    const content = answer?.choices[0].message?.content ?? '';
+    let content = '';
+    if (cl) {
+      content = await this.askCL(prompt);
+    } else {
+      const answer = await this.ask(prompt);
+      content = answer?.choices[0].message?.content ?? '';
+    }
     // Return the 1st response to Discord
     await this.followupMessage(request, {
       content,

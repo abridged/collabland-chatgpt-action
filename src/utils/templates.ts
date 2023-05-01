@@ -1,3 +1,8 @@
+// Copyright Abridged, Inc. 2023. All Rights Reserved.
+// Node module: @collabland/chatgpt-action
+// This file is licensed under the MIT License.
+// License text available at https://opensource.org/licenses/MIT
+
 const templates = {
   qaTemplate: `Answer the question based on the context below. You should follow ALL the following rules when generating and answer:
         - There will be a CONVERSATION LOG, CONTEXT, and a QUESTION.

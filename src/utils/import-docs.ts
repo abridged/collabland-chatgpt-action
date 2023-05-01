@@ -1,10 +1,15 @@
+// Copyright Abridged, Inc. 2023. All Rights Reserved.
+// Node module: @collabland/chatgpt-action
+// This file is licensed under the MIT License.
+// License text available at https://opensource.org/licenses/MIT
+
 import {getEnvVar} from '@collabland/common';
-import {OpenAIEmbeddings} from 'langchain/embeddings/openai';
 import {TokenTextSplitter} from 'langchain/text_splitter';
 
+import {loadSecrets} from '@collabland/aws';
 import {GithubRepoLoader} from 'langchain/document_loaders/web/github';
-import {PineconeStore} from 'langchain/vectorstores/pinecone';
-import {getPineconeClient} from './pinecone.js';
+import {OpenSearchVectorStoreService} from './opensearch.js';
+import {PineconeVectorStoreService} from './pinecone.js';
 
 async function loadGithubRepo(repoUrl: string) {
   const loader = new GithubRepoLoader(repoUrl, {
@@ -23,10 +28,13 @@ async function loadGithubRepo(repoUrl: string) {
   return docs;
 }
 
-export async function main(url: string) {
-  const pineconeIndexName = getEnvVar('PINECONE_INDEX_NAME')!;
-
-  const pinecone = await getPineconeClient();
+export async function main(url: string, store = 'opensearch') {
+  await loadSecrets();
+  const vectorStore =
+    store === 'opensearch'
+      ? new OpenSearchVectorStoreService()
+      : new PineconeVectorStoreService();
+  await vectorStore.init();
 
   const splitter = new TokenTextSplitter({
     encodingName: 'gpt2',
@@ -40,14 +48,9 @@ export async function main(url: string) {
 
   console.log('Splitted documents: %O', documents.length);
 
-  const index = pinecone.Index(pineconeIndexName);
-  const embedder = new OpenAIEmbeddings({
-    modelName: 'text-embedding-ada-002',
-  });
-
-  await PineconeStore.fromDocuments(documents, embedder, {
-    pineconeIndex: index,
-  });
+  await vectorStore.importDocs(documents);
+  await vectorStore.stop();
 }
 
 await main('https://github.com/abridged/collabland-dev');
+// await main('https://github.com/abridged/collabland-help-center');

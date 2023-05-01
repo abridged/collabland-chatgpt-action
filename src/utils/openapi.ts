@@ -1,3 +1,8 @@
+// Copyright Abridged, Inc. 2023. All Rights Reserved.
+// Node module: @collabland/chatgpt-action
+// This file is licensed under the MIT License.
+// License text available at https://opensource.org/licenses/MIT
+
 import {getEnvVar, getFetch, handleFetchResponse} from '@collabland/common';
 import {OpenApiToolkit, createOpenApiAgent} from 'langchain/agents';
 import {OpenAI} from 'langchain/llms/openai';

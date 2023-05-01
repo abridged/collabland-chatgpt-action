@@ -1,11 +1,17 @@
+// Copyright Abridged, Inc. 2023. All Rights Reserved.
+// Node module: @collabland/chatgpt-action
+// This file is licensed under the MIT License.
+// License text available at https://opensource.org/licenses/MIT
+
 import {generateIdSync, getEnvVar} from '@collabland/common';
 import {Vector} from '@pinecone-database/pinecone';
 import {OpenAIEmbeddings} from 'langchain/embeddings/openai';
 import {TokenTextSplitter} from 'langchain/text_splitter';
 
+import {loadSecrets} from '@collabland/aws';
 import {Document} from 'langchain/document';
 import {PuppeteerWebBaseLoader} from 'langchain/document_loaders/web/puppeteer';
-import {getPineconeClient} from './pinecone.js';
+import {PineconeVectorStoreService} from './pinecone.js';
 
 async function loadUrl(url: string) {
   /**
@@ -38,9 +44,10 @@ const sliceIntoChunks = (arr: Vector[], chunkSize: number) => {
 };
 
 export async function main(url: string) {
+  await loadSecrets();
   const pineconeIndexName = getEnvVar('PINECONE_INDEX_NAME')!;
 
-  const pinecone = await getPineconeClient();
+  const pinecone = new PineconeVectorStoreService();
 
   const pages: Document<Record<string, any>>[] = [];
 
@@ -61,7 +68,7 @@ export async function main(url: string) {
 
   console.log('Documents: %O', documents);
 
-  const index = pinecone?.Index(pineconeIndexName);
+  const index = await pinecone.getIndex(pineconeIndexName);
   const embedder = new OpenAIEmbeddings({
     modelName: 'text-embedding-ada-002',
   });
