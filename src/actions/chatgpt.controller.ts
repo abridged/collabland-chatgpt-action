@@ -5,7 +5,6 @@
 
 import {
   debugFactory,
-  getEnvVar,
   resolvePromiseWithTimeout,
   stringify,
 } from '@collabland/common';
@@ -25,7 +24,12 @@ import {
   getCommandOptionValue,
 } from '@collabland/discord';
 import {MiniAppManifest} from '@collabland/models';
-import {BindingScope, asLifeCycleObserver, injectable} from '@loopback/core';
+import {
+  BindingScope,
+  asLifeCycleObserver,
+  inject,
+  injectable,
+} from '@loopback/core';
 import {api} from '@loopback/rest';
 import {
   APIInteraction,
@@ -42,13 +46,10 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
-import {
-  Configuration,
-  CreateChatCompletionResponse,
-  CreateCompletionResponse,
-  OpenAIApi,
-} from 'openai';
-import {CollabLandQA} from '../utils/conversation.js';
+import {CreateChatCompletionResponse, CreateCompletionResponse} from 'openai';
+import type {ConversationService} from '../langchain/conversation.service.js';
+import {CONVERSATION__SERVICE, OPENAI_SERVICE} from '../langchain/keys.js';
+import type {OpenAIService} from '../langchain/openai.service.js';
 
 const debug = debugFactory('collabland:chatgpt');
 /**
@@ -63,23 +64,21 @@ const debug = debugFactory('collabland:chatgpt');
 )
 @api({basePath: '/chatgpt'}) // Set the base path to `/chatgpt`
 export class ChatGPTController extends BaseDiscordActionController<APIInteraction> {
-  private chatgpt: OpenAIApi;
-  private qa: CollabLandQA;
+  @inject(CONVERSATION__SERVICE)
+  private qa: ConversationService;
+
+  @inject(OPENAI_SERVICE)
+  private openaiService: OpenAIService;
 
   constructor() {
     super();
-
-    const configuration = new Configuration({
-      apiKey: getEnvVar('OPENAI_API_KEY'),
-    });
-    this.chatgpt = new OpenAIApi(configuration);
-    this.qa = new CollabLandQA();
   }
 
   async ask(prompt: string): Promise<CreateChatCompletionResponse> {
+    const chatgpt = this.openaiService.openAIApi;
     console.log('ChatGPT prompt: %s', prompt);
-    const completion = this.chatgpt.createChatCompletion({
-      model: 'gpt-3.5-turbo',
+    const completion = chatgpt.createChatCompletion({
+      model: 'gpt-4',
       messages: [
         /*
         {
@@ -95,20 +94,20 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     });
     const res = await resolvePromiseWithTimeout(
       completion,
-      30000,
-      'Timeout: ChatGPT does not respond in 30 seconds',
+      60000,
+      'Timeout: ChatGPT does not respond in 60 seconds',
     );
     console.log('ChatGPT response: %s', stringify(res.data));
     return res.data;
   }
 
   async askCL(prompt: string): Promise<string> {
-    console.log('ChatGPT prompt: %s', prompt);
+    console.log('ChatGPT prompt for Collab.Land: %s', prompt);
     const completion = this.qa.ask(prompt);
     const res = await resolvePromiseWithTimeout(
       completion,
-      30000,
-      'Timeout: ChatGPT does not respond in 30 seconds',
+      60000,
+      'Timeout: ChatGPT does not respond in 60 seconds',
     );
     console.log('ChatGPT response: %s', res);
     return res;

@@ -3,21 +3,50 @@
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
-import {debugFactory, getEnvVar} from '@collabland/common';
+import {
+  AnyType,
+  PMapByPageOptions,
+  debugFactory,
+  getEnvVar,
+  pMapByPage,
+} from '@collabland/common';
+import {
+  BindingScope,
+  ContextTags,
+  asLifeCycleObserver,
+  extensionFor,
+  inject,
+  injectable,
+} from '@loopback/core';
 import {PineconeClient} from '@pinecone-database/pinecone';
 import {Document} from 'langchain/document';
 import {OpenAIEmbeddings} from 'langchain/embeddings';
-import {PineconeStore} from 'langchain/vectorstores';
-import {OpenAIHelper} from './openai.js';
+import {PineconeStore} from 'langchain/vectorstores/pinecone';
+import {OPENAI_SERVICE, PINECONE_VECTOR_STORE__SERVICE} from './keys.js';
+import {OpenAIService} from './openai.service.js';
+import {LANGCHAIN_VECTOR_STORES, VectorStoreService} from './types.js';
 
 const debug = debugFactory('collabland:pinecone');
 
-export class PineconeVectorStoreService {
-  private pinecone: PineconeClient | null = null;
+@injectable(
+  {
+    scope: BindingScope.SINGLETON,
+    tags: {
+      [ContextTags.KEY]: PINECONE_VECTOR_STORE__SERVICE,
+    },
+  },
+  asLifeCycleObserver,
+  extensionFor(LANGCHAIN_VECTOR_STORES),
+)
+export class PineconeVectorStoreService
+  implements VectorStoreService<PineconeStore>
+{
+  readonly name = 'pinecone';
+  private pinecone: PineconeClient;
   private embeddings: OpenAIEmbeddings;
 
-  constructor() {
-    this.embeddings = new OpenAIHelper().embeddings;
+  constructor(@inject(OPENAI_SERVICE) openAIService: OpenAIService) {
+    this.embeddings = openAIService.embeddings;
   }
 
   async init() {
@@ -38,13 +67,22 @@ export class PineconeVectorStoreService {
     return this.pinecone;
   }
 
-  async importDocs(docs: Document<Record<string, any>>[]) {
-    const index = await this.getIndex();
-    const store = await PineconeStore.fromDocuments(docs, this.embeddings, {
-      pineconeIndex: index,
-    });
+  async importDocs(
+    docs: Document<Record<string, AnyType>>[],
+    indexName?: string,
+    options?: PMapByPageOptions,
+  ) {
+    const index = await this.getIndex(indexName);
 
-    return store;
+    await pMapByPage(
+      docs,
+      async page => {
+        await PineconeStore.fromDocuments(page, this.embeddings, {
+          pineconeIndex: index,
+        });
+      },
+      {pageSize: 1000, concurrency: 5, ...options},
+    );
   }
 
   async getIndex(indexName?: string) {

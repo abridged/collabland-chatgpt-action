@@ -7,9 +7,13 @@ import {getEnvVar} from '@collabland/common';
 import {TokenTextSplitter} from 'langchain/text_splitter';
 
 import {loadSecrets} from '@collabland/aws';
+import {Application} from '@loopback/core';
 import {GithubRepoLoader} from 'langchain/document_loaders/web/github';
-import {OpenSearchVectorStoreService} from './opensearch.js';
-import {PineconeVectorStoreService} from './pinecone.js';
+import {ChatGPTActionComponent} from '../component.js';
+import {
+  OPENSEARCH_VECTOR_STORE__SERVICE,
+  PINECONE_VECTOR_STORE__SERVICE,
+} from './keys.js';
 
 async function loadGithubRepo(repoUrl: string) {
   const loader = new GithubRepoLoader(repoUrl, {
@@ -30,11 +34,13 @@ async function loadGithubRepo(repoUrl: string) {
 
 export async function main(url: string, store = 'opensearch') {
   await loadSecrets();
+  const app = new Application();
+  app.component(ChatGPTActionComponent);
+  await app.start();
   const vectorStore =
     store === 'opensearch'
-      ? new OpenSearchVectorStoreService()
-      : new PineconeVectorStoreService();
-  await vectorStore.init();
+      ? await app.get(OPENSEARCH_VECTOR_STORE__SERVICE)
+      : await app.get(PINECONE_VECTOR_STORE__SERVICE);
 
   const splitter = new TokenTextSplitter({
     encodingName: 'gpt2',
@@ -49,8 +55,5 @@ export async function main(url: string, store = 'opensearch') {
   console.log('Splitted documents: %O', documents.length);
 
   await vectorStore.importDocs(documents);
-  await vectorStore.stop();
+  await app.stop();
 }
-
-await main('https://github.com/abridged/collabland-dev');
-// await main('https://github.com/abridged/collabland-help-center');

@@ -11,7 +11,8 @@ import {TokenTextSplitter} from 'langchain/text_splitter';
 import {loadSecrets} from '@collabland/aws';
 import {Document} from 'langchain/document';
 import {PuppeteerWebBaseLoader} from 'langchain/document_loaders/web/puppeteer';
-import {PineconeVectorStoreService} from './pinecone.js';
+import {OpenAIService} from '../../langchain/openai.service.js';
+import {PineconeVectorStoreService} from '../../langchain/pinecone.service.js';
 
 async function loadUrl(url: string) {
   /**
@@ -47,7 +48,7 @@ export async function main(url: string) {
   await loadSecrets();
   const pineconeIndexName = getEnvVar('PINECONE_INDEX_NAME')!;
 
-  const pinecone = new PineconeVectorStoreService();
+  const pinecone = new PineconeVectorStoreService(new OpenAIService());
 
   const pages: Document<Record<string, any>>[] = [];
 
