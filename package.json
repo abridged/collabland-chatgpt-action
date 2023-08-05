@@ -23,8 +23,8 @@
     "test": "lb-mocha --allow-console-logs \"dist/__tests__\"",
     "rebuild": "npm run clean && npm run build",
     "clean": "lb-clean dist *.tsbuildinfo .eslintcache",
-    "start": "npm run rebuild && node dist/server",
-    "server": "node dist/server bc9b6e5b99a10481e47aad74dbfdadb125e3c50a642ed2546b3602e43373c93a"
+    "start": "npm run build && npm run server",
+    "server": "node dist/server DhF7T98EBmH1ZFmdGJvBhkmdn3BfAqc3tz8LxER8VH2q"
   },
   "repository": {
     "type": "git",
@@ -41,25 +41,24 @@
     "!*/__tests__"
   ],
   "dependencies": {
-    "@collabland/action": "^0.6.0",
-    "@collabland/common": "^0.44.0",
-    "@collabland/discord": "^0.23.0",
-    "@collabland/models": "^0.24.0",
-    "@loopback/core": "^4.0.8",
-    "@loopback/rest": "^12.0.8",
-    "discord-api-types": "^0.37.35",
-    "discord.js": "^14.7.1",
-    "openai": "^3.2.1",
-    "chromadb": "^1.3.1",
-    "langchain": "^0.0.49-1",
+    "@collabland/action": "^0.8.0",
+    "@collabland/common": "^0.47.0",
+    "@collabland/discord": "^0.26.0",
+    "@collabland/models": "^0.27.0",
+    "@loopback/core": "^5.1.1",
+    "@loopback/rest": "^13.1.1",
+    "discord-api-types": "^0.37.51",
+    "discord.js": "^14.12.1",
+    "openai": "^3.3.0",
+    "langchain": "^0.0.123",
     "tslib": "^2.0.0"
   },
   "devDependencies": {
-    "@loopback/build": "^9.0.8",
-    "@loopback/eslint-config": "^13.0.8",
-    "@loopback/testlab": "^5.0.8",
+    "@loopback/build": "^10.1.1",
+    "@loopback/eslint-config": "^14.0.2",
+    "@loopback/testlab": "^6.1.1",
     "@types/node": "^18.11.15",
-    "typescript": "~4.9.5"
+    "typescript": "~5.1.6"
   },
   "copyright.owner": "Abridged, Inc.",
   "author": "Abridged, Inc."

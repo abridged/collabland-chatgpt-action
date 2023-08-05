@@ -16,22 +16,22 @@ import {
   ApplicationCommandSpec,
   ApplicationCommandType,
   BaseDiscordActionController,
-  buildSimpleResponse,
   DiscordActionMetadata,
   DiscordActionRequest,
   DiscordActionResponse,
   DiscordInteractionPattern,
-  getCommandOptionValue,
   InteractionType,
+  buildSimpleResponse,
+  getCommandOptionValue,
 } from '@collabland/discord';
 import {MiniAppManifest} from '@collabland/models';
-import {asLifeCycleObserver, BindingScope, injectable} from '@loopback/core';
+import {BindingScope, asLifeCycleObserver, injectable} from '@loopback/core';
 import {api} from '@loopback/rest';
 import {
-  ActionRowBuilder,
   APIInteraction,
   APIMessageComponentInteraction,
   APIModalSubmitInteraction,
+  ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
   InteractionResponseType,
@@ -39,6 +39,7 @@ import {
   MessageFlags,
   ModalActionRowComponentBuilder,
   ModalBuilder,
+  RESTPostAPIWebhookWithTokenJSONBody,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
@@ -76,19 +77,25 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
   async ask(prompt: string): Promise<CreateChatCompletionResponse> {
     console.log('ChatGPT prompt: %s', prompt);
     const completion = this.chatgpt.createChatCompletion({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4',
       messages: [
         /*
         {
           role: 'assistant',
           content: '',
         },
+        {
+          role: 'system',
+          content:
+            'You are a Discord bots that generates' +
+            ' interaction response messages in JSON as the output',
+        },
         */
         {role: 'user', content: prompt},
       ],
-      temperature: 0.6,
+      temperature: 0,
       // n: 5,
-      max_tokens: 1024,
+      max_tokens: 4096,
     });
     const res = await resolvePromiseWithTimeout(
       completion,
@@ -223,10 +230,25 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
   ) {
     const answer = await this.ask(prompt);
     const content = answer?.choices[0].message?.content ?? '';
-    // Return the 1st response to Discord
-    await this.followupMessage(request, {
-      content,
-      /*
+
+    try {
+      let discordMessage: RESTPostAPIWebhookWithTokenJSONBody;
+      const start = content.indexOf('```json');
+      const end = content.indexOf('```', start + '```json'.length);
+      if (start !== -1 && end !== -1) {
+        const json = content.substring(start + '```json'.length, end);
+        discordMessage = JSON.parse(json);
+        discordMessage.content = content + '\n\n' + discordMessage.content;
+      } else {
+        discordMessage = JSON.parse(content);
+        discordMessage.content = content + '\n\n' + discordMessage.content;
+      }
+      await this.followupMessage(request, discordMessage);
+    } catch (err) {
+      // Return the 1st response to Discord
+      await this.followupMessage(request, {
+        content,
+        /*
       embeds: [
         new EmbedBuilder()
           .setAuthor({
@@ -237,24 +259,25 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
           .toJSON(),
       ],
       */
-      components: [
-        new ActionRowBuilder<MessageActionRowComponentBuilder>()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('chatgpt:ask')
-              .setEmoji('🙋‍♂️')
-              .setLabel('Chat more')
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId('chatgpt:sponsor')
-              .setEmoji('🎁')
-              .setLabel('Tip the action developer')
-              .setStyle(ButtonStyle.Success),
-          )
-          .toJSON(),
-      ],
-      flags: MessageFlags.Ephemeral,
-    });
+        components: [
+          new ActionRowBuilder<MessageActionRowComponentBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setCustomId('chatgpt:ask')
+                .setEmoji('🙋‍♂️')
+                .setLabel('Chat more')
+                .setStyle(ButtonStyle.Primary),
+              new ButtonBuilder()
+                .setCustomId('chatgpt:sponsor')
+                .setEmoji('🎁')
+                .setLabel('Tip the action developer')
+                .setStyle(ButtonStyle.Success),
+            )
+            .toJSON(),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
+    }
   }
 
   /**
