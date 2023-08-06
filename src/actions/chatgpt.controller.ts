@@ -49,6 +49,7 @@ import {
   CreateCompletionResponse,
   OpenAIApi,
 } from 'openai';
+import {EXAMPLE_RESPONSES} from './discord-example-responses.js';
 
 const debug = debugFactory('collabland:chatgpt');
 /**
@@ -91,6 +92,14 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
             ' interaction response messages in JSON as the output',
         },
         */
+        {
+          role: 'user',
+          content: `Given the following examples for Discord interaction responses:
+        \`\`\`json
+        ${stringify(EXAMPLE_RESPONSES)}
+        \`\`\`
+        `,
+        },
         {role: 'user', content: prompt},
       ],
       temperature: 0,
@@ -99,8 +108,8 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     });
     const res = await resolvePromiseWithTimeout(
       completion,
-      30000,
-      'Timeout: ChatGPT does not respond in 30 seconds',
+      120000,
+      'Timeout: ChatGPT does not respond in 2 minutes',
     );
     console.log('ChatGPT response: %s', stringify(res.data));
     return res.data;
@@ -232,19 +241,11 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
     const content = answer?.choices[0].message?.content ?? '';
 
     try {
-      let discordMessage: RESTPostAPIWebhookWithTokenJSONBody;
-      const start = content.indexOf('```json');
-      const end = content.indexOf('```', start + '```json'.length);
-      if (start !== -1 && end !== -1) {
-        const json = content.substring(start + '```json'.length, end);
-        discordMessage = JSON.parse(json);
-        discordMessage.content = content + '\n\n' + discordMessage.content;
-      } else {
-        discordMessage = JSON.parse(content);
-        discordMessage.content = content + '\n\n' + discordMessage.content;
-      }
+      let discordMessage: RESTPostAPIWebhookWithTokenJSONBody =
+        this.extractDiscordMessage(content);
       await this.followupMessage(request, discordMessage);
     } catch (err) {
+      console.error('Failed to send message to Discord: %s', stringify(err));
       // Return the 1st response to Discord
       await this.followupMessage(request, {
         content,
@@ -278,6 +279,25 @@ export class ChatGPTController extends BaseDiscordActionController<APIInteractio
         flags: MessageFlags.Ephemeral,
       });
     }
+  }
+
+  private extractDiscordMessage(content: string) {
+    let discordMessage: RESTPostAPIWebhookWithTokenJSONBody;
+    const start = content.indexOf('```json');
+    const end = content.indexOf('```', start + '```json'.length);
+    if (start !== -1 && end !== -1) {
+      const json = content.substring(start + '```json'.length, end);
+      console.log('JSON: %s', json);
+      discordMessage = JSON.parse(json);
+      discordMessage.content =
+        content + '\n\n' + (discordMessage.content ?? '');
+    } else {
+      discordMessage = JSON.parse(content);
+      discordMessage.content =
+        content + '\n\n' + (discordMessage.content ?? '');
+    }
+    console.log('Discord message: %O', discordMessage);
+    return discordMessage;
   }
 
   /**
